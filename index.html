@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vehicle Live Location</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Leaflet OpenStreetMap CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
+        #map { height: 100vh; width: 100vw; }
+        .status-box {
+            position: absolute; top: 10px; left: 10px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); padding: 10px 15px;
+            border-radius: 8px; font-family: Arial, sans-serif;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="status-box">
+        <h4 style="margin:0 0 5px 0;">Live Tracker</h4>
+        <div id="status">Connecting to Firebase...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Firebase App & Database JS -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        // 1. ഫയർബേസ് കോൺഫിഗറേഷൻ (നിങ്ങളുടെ ഫയർബേസ് ഡീറ്റെയിൽസ് മാറ്റുക)
+        const firebaseConfig = {
+            databaseURL: "YOUR_FIREBASE_DATABASE_URL" 
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // 2. മാപ്പ് ഇനിഷ്യലൈസ് ചെയ്യൽ
+        var map = L.map('map').setView([8.5241, 76.9366], 13); // ഡിഫോൾട്ട് ലൊക്കേഷൻ
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        var marker = L.marker([8.5241, 76.9366]).addTo(map);
+
+        // 3. ഫയർബേസിൽ നിന്ന് റിയൽടൈം ആയി Lat/Long റീഡ് ചെയ്യൽ
+        const locationRef = database.ref('GPS_Data'); // നിങ്ങളുടെ ഫയർബേസ് നോഡിന്റെ പേര്
+
+        locationRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                var lat = parseFloat(data.latitude);
+                var lng = parseFloat(data.longitude);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    var newLatLng = new L.LatLng(lat, lng);
+                    marker.setLatLng(newLatLng);
+                    map.panTo(newLatLng);
+                    document.getElementById('status').innerText = "Live: " + lat.toFixed(4) + ", " + lng.toFixed(4);
+                }
+            }
+        }, (error) => {
+            document.getElementById('status').innerText = "Connection Error!";
+        });
+    </script>
+</body>
+</html>
