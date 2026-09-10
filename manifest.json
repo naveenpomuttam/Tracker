@@ -1,0 +1,13 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Bus Tracker",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Bus Tracker",
+  "start_url": "https://naveenpomuttam.github.io/Tracker/",
+  "theme_color": "#ffffff",
+  "id": "Bus Tracker",
+  "description": "live bus tracking app"
+}
