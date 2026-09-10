@@ -1,72 +1,105 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="manifest" href="manifest.json" />
-    <title>Vehicle Live Location</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <!-- Leaflet OpenStreetMap CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; }
-        #map { height: 100vh; width: 100vw; }
-        .status-box {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.9); padding: 10px 15px;
-            border-radius: 8px; font-family: Arial, sans-serif;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live GPS Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+  </style>
 </head>
 <body>
 
-    <div class="status-box">
-        <h4 style="margin:0 0 5px 0;">Live Tracker</h4>
-        <div id="status">Connecting to Firebase...</div>
-    </div>
+  <div id="status">Connecting to Firebase...</div>
+  <div id="map"></div>
 
-    <div id="map"></div>
+  <!-- Leaflet JS for Maps -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Firebase App & Database JS -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script>
-        // 1. ഫയർബേസ് കോൺഫിഗറേഷൻ (നിങ്ങളുടെ ഫയർബേസ് ഡീറ്റെയിൽസ് മാറ്റുക)
-        const firebaseConfig = {
-            databaseURL: "YOUR_FIREBASE_DATABASE_URL" 
-        };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+  <script>
+    // നിങ്ങളുടെ ഫയർബേസ് കോൺഫിഗറേഷൻ
+    const firebaseConfig = {
+      databaseURL: "https://gps-tracker-4714a-default-rtdb.firebaseio.com"
+    };
 
-        // 2. മാപ്പ് ഇനിഷ്യലൈസ് ചെയ്യൽ
-        var map = L.map('map').setView([8.5241, 76.9366], 13); // ഡിഫോൾട്ട് ലൊക്കേഷൻ
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-        var marker = L.marker([8.5241, 76.9366]).addTo(map);
+    // Leaflet Map Initialization
+    const map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
 
-        // 3. ഫയർബേസിൽ നിന്ന് റിയൽടൈം ആയി Lat/Long റീഡ് ചെയ്യൽ
-        const locationRef = database.ref('GPS_Data'); // നിങ്ങളുടെ ഫയർബേസ് നോഡിന്റെ പേര്
+    let marker, circle;
+    let firstLoad = true;
 
-        locationRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                var lat = parseFloat(data.latitude);
-                var lng = parseFloat(data.longitude);
+    // Read Data from 'GPS' path
+    const gpsRef = database.ref('GPS');
 
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    var newLatLng = new L.LatLng(lat, lng);
-                    marker.setLatLng(newLatLng);
-                    map.panTo(newLatLng);
-                    document.getElementById('status').innerText = "Live: " + lat.toFixed(4) + ", " + lng.toFixed(4);
-                }
-            }
-        }, (error) => {
-            document.getElementById('status').innerText = "Connection Error!";
-        });
-    </script>
+    gpsRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      const statusDiv = document.getElementById('status');
+
+      if (data && data.Latitude && data.longitude) {
+        const lat = parseFloat(data.Latitude);
+        const lng = parseFloat(data.longitude);
+        const sats = data.satellites || 0;
+
+        statusDiv.innerText = `Live GPS Connected (${sats} Satellites)`;
+        statusDiv.style.background = "rgba(40, 167, 69, 0.9)";
+
+        // Update Marker Position
+        if (marker) {
+          marker.setLatLng([lat, lng]);
+        } else {
+          marker = L.marker([lat, lng]).addTo(map);
+        }
+
+        // Center Map on Location First Time
+        if (firstLoad) {
+          map.setView([lat, lng], 16);
+          firstLoad = false;
+        }
+      } else {
+        statusDiv.innerText = "Waiting for valid GPS data...";
+        statusDiv.style.background = "rgba(220, 53, 69, 0.9)";
+      }
+    }, (error) => {
+      document.getElementById('status').innerText = "Database Connection Failed!";
+      console.error(error);
+    });
+  </script>
 </body>
 </html>
