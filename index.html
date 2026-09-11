@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live GPS Tracker</title>
+  <title>Live GPS Tracker - Naveen Chandra</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -33,9 +33,83 @@
       text-align: center;
       transition: background 0.3s ease;
     }
+
+    /* വെൽക്കം പോപ്പ്-അപ്പ് വിൻഡോയുടെ സ്റ്റൈലുകൾ */
+    #welcomeModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .modal-content {
+      background: #ffffff;
+      padding: 25px;
+      border-radius: 16px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      animation: fadeIn 0.4s ease-out;
+    }
+    .bus-icon {
+      font-size: 50px;
+      margin-bottom: 10px;
+    }
+    .modal-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #1a73e8;
+      margin-bottom: 10px;
+    }
+    .modal-text {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .start-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(40, 167, 69, 0.4);
+      transition: transform 0.2s;
+    }
+    .start-btn:active {
+      transform: scale(0.95);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
+
+  <!-- വെൽക്കം മെസ്സേജ് പോപ്പ്-അപ്പ് -->
+  <div id="welcomeModal">
+    <div class="modal-content">
+      <div class="bus-icon">🚌</div>
+      <div class="modal-title">സ്വാഗതം!</div>
+      <div class="modal-text">
+        ഇത് <b>നവീൻ ചന്ദ്ര</b> വികസിപ്പിച്ചെടുത്ത ജിപിഎസ് ട്രാക്കർ ആപ്പാണ്. ജിപിഎസ് (GPS) സാങ്കേതികവിദ്യയും സ്മാർട്ട് അലേർട്ട് സിസ്റ്റവും ഉപയോഗിച്ചാണ് ഈ ആപ്പ് സജ്ജീകരിച്ചിരിക്കുന്നത്.<br><br>
+        വാഹനം നിങ്ങളുടെ ലൊക്കേഷന്റെ <b>500 മീറ്റർ</b> ചുറ്റളവിൽ എത്തുമ്പോൾ ശബ്ദത്തോടെയുള്ള അലാറം ലഭിക്കാൻ താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
+      </div>
+      <button class="start-btn" onclick="enableAudioAndCloseModal()">ട്രാക്കിംഗ് ആരംഭിക്കുക 🔔</button>
+    </div>
+  </div>
 
   <div id="status">Connecting to Firebase...</div>
   <div id="map"></div>
@@ -48,12 +122,43 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // Firebase Config
+    // ==========================================
+    // 1. നിങ്ങളുടെ സ്റ്റോപ്പിന്റെ ലൊക്കേഷൻ ക്രമീകരണങ്ങൾ
+    // (നിങ്ങളുടെ വീടിന്റെ/സ്റ്റോപ്പിന്റെ Lat, Lng ഇവിടെ നൽകുക)
+    // ==========================================
+    const TARGET_LAT = 8.6823;   // നിങ്ങളുടെ ലൊക്കേഷന്റെ Latitude നൽകുക
+    const TARGET_LNG = 76.8214;  // നിങ്ങളുടെ ലൊക്കേഷന്റെ Longitude നൽകുക
+    const TRIGGER_RADIUS_METERS = 500; // അലാറം അടിക്കേണ്ട ദൂരം (500 മീറ്റർ)
+
+    let alarmPlayed = false;
+    let audioAllowed = false;
+
+    // ഓഡിയോ അലാറം സൗണ്ട്
+    const alarmSound = new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
+
+    // പോപ്പ്-അപ്പ് ക്ലോസ് ചെയ്യാനും ഓഡിയോ പെർമിഷൻ ആക്ടീവ് ആക്കാനും
+    function enableAudioAndCloseModal() {
+      audioAllowed = true;
+      alarmSound.play().then(() => {
+        alarmSound.pause();
+        alarmSound.currentTime = 0;
+      }).catch(e => console.log("Audio prep error:", e));
+
+      // നോട്ടിഫിക്കേഷൻ പെർമിഷൻ ചോദിക്കുന്നു
+      if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+
+      document.getElementById('welcomeModal').style.display = 'none';
+    }
+
+    // ==========================================
+    // 2. FIREBASE CONFIG
+    // ==========================================
     const firebaseConfig = {
       databaseURL: "https://gps-tracker-4714a-default-rtdb.firebaseio.com"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
@@ -64,11 +169,48 @@
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
+    // നിങ്ങളുടെ സ്റ്റോപ്പ് ലൊക്കേഷൻ മാപ്പിൽ കാണിക്കുന്നു (Blue Marker)
+    const targetMarker = L.marker([TARGET_LAT, TARGET_LNG]).addTo(map)
+      .bindPopup("<b>നിങ്ങളുടെ സ്റ്റോപ്പ് / ലക്ഷ്യസ്ഥാനം</b>").openPopup();
+
     let marker;
     let firstLoad = true;
     let lastDataTime = Date.now();
 
     const statusDiv = document.getElementById('status');
+
+    // Haversine Formula: രണ്ട് ലൊക്കേഷനുകൾ തമ്മിലുള്ള ദൂരം മീറ്ററിൽ കണക്കാക്കുന്നു
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Earth radius in meters
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2); 
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+      return R * c;
+    }
+
+    // അലാറവും നോട്ടിഫിക്കേഷനും അയക്കുന്ന ഫംഗ്ഷൻ
+    function triggerGeofenceAlarm(distance) {
+      if (!alarmPlayed) {
+        if (audioAllowed) {
+          alarmSound.play().catch(e => console.log("Audio play error:", e));
+        }
+
+        // ബ്രൗസർ നോട്ടിഫിക്കേഷൻ
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("വാഹനം അടുത്തെത്തി! 🚌", {
+            body: `വാഹനം നിങ്ങളുടെ ലൊക്കേഷന്റെ ${Math.round(distance)} മീറ്റർ ചുറ്റളവിൽ എത്തിയിരിക്കുന്നു!`,
+            icon: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
+          });
+        }
+
+        alert(`⚠️ വാഹനം നിങ്ങളുടെ ലൊക്കേഷന്റെ ${Math.round(distance)} മീറ്റർ ചുറ്റളവിൽ എത്തിയിരിക്കുന്നു!`);
+        alarmPlayed = true;
+      }
+    }
 
     // Read Data from 'GPS' path
     const gpsRef = database.ref('GPS');
@@ -77,7 +219,7 @@
       const data = snapshot.val();
 
       if (data) {
-        lastDataTime = Date.now(); // പുതിയ ഡാറ്റ എത്തിയ സമയം രേഖപ്പെടുത്തുന്നു
+        lastDataTime = Date.now();
 
         const rawLat = data.Latitude || data.latitude || data.lat;
         const rawLng = data.longitude || data.Longitude || data.lng;
@@ -89,9 +231,19 @@
         if (deviceStatus === "ONLINE" && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
           const sats = data.satellites || data.Satellites || 0;
           
-          statusDiv.innerText = `Live GPS Connected 🟢 (${sats} Satellites)`;
-          statusDiv.style.background = "rgba(40, 167, 69, 0.9)"; // Green Color
+          // ദൂരം അളക്കുന്നു
+          const distanceMeters = getDistanceFromLatLonInMeters(lat, lng, TARGET_LAT, TARGET_LNG);
+
+          statusDiv.innerText = `Live GPS Connected 🟢 (${sats} Satellites) - ${Math.round(distanceMeters)}m അകലെ`;
+          statusDiv.style.background = "rgba(40, 167, 69, 0.9)";
           statusDiv.style.color = "#fff";
+
+          // 500 മീറ്ററിൽ താഴെയാണോ എന്ന് പരിശോധിക്കുന്നു
+          if (distanceMeters <= TRIGGER_RADIUS_METERS) {
+            triggerGeofenceAlarm(distanceMeters);
+          } else {
+            alarmPlayed = false; // വാഹനം വീണ്ടും പുറത്തുപോയാൽ അലാറം റീസെറ്റ് ആകുന്നു
+          }
 
           // Marker Update
           if (marker) {
@@ -106,7 +258,7 @@
           }
         } else if (deviceStatus === "NO_GPS_FIX") {
           statusDiv.innerText = "Waiting for GPS Satellite Fix... 🟡 (0 Satellites)";
-          statusDiv.style.background = "rgba(255, 193, 7, 0.9)"; // Yellow Color
+          statusDiv.style.background = "rgba(255, 193, 7, 0.9)";
           statusDiv.style.color = "#000";
         }
       }
@@ -116,7 +268,7 @@
     setInterval(() => {
       if (Date.now() - lastDataTime > 8000) {
         statusDiv.innerText = "Bus Offline 🔴 (0 Satellites)";
-        statusDiv.style.background = "rgba(220, 53, 69, 0.9)"; // Red Color
+        statusDiv.style.background = "rgba(220, 53, 69, 0.9)";
         statusDiv.style.color = "#fff";
       }
     }, 2000);
