@@ -101,9 +101,9 @@
       <div class="modal-title">സ്വാഗതം!</div>
       <div class="modal-text">
         ഇത് <b>നവീൻ ചന്ദ്ര</b> വികസിപ്പിച്ചെടുത്ത ജിപിഎസ് ട്രാക്കർ ആപ്പാണ്.<br><br>
-        ലൈവ് ട്രാക്കിംഗ് ആരംഭിക്കാനും നോട്ടിഫിക്കേഷനുകൾ ലഭിക്കാനും താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
+        ലൈവ് ട്രാക്കിംഗ് ആരംഭിക്കാൻ താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
       </div>
-      <button class="start-btn" onclick="startTracking()">ട്രാക്കിംഗ് ആരംഭിക്കുക 🔔</button>
+      <button class="start-btn" onclick="startTracking()">ട്രാക്കിംഗ് ആരംഭിക്കുക</button>
     </div>
   </div>
 
@@ -119,9 +119,6 @@
 
   <script>
     function startTracking() {
-      if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
-      }
       document.getElementById('welcomeModal').style.display = 'none';
     }
 
