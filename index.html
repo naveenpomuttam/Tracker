@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live GPS Tracker - Naveen Chandra</title>
+  <title>Live GPS Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -101,7 +101,7 @@
       <div class="modal-title">സ്വാഗതം!</div>
       <div class="modal-text">
         ഇത് <b>നവീൻ ചന്ദ്ര</b> വികസിപ്പിച്ചെടുത്ത ജിപിഎസ് ട്രാക്കർ ആപ്പാണ്.<br><br>
-        വാഹനം നിങ്ങളുടെ ലൊക്കേഷന്റെ <b>500 മീറ്റർ</b> ചുറ്റളവിൽ എത്തുമ്പോൾ നോട്ടിഫിക്കേഷൻ ലഭിക്കാൻ താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
+        ലൈവ് ട്രാക്കിംഗ് ആരംഭിക്കാനും നോട്ടിഫിക്കേഷനുകൾ ലഭിക്കാനും താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
       </div>
       <button class="start-btn" onclick="startTracking()">ട്രാക്കിംഗ് ആരംഭിക്കുക 🔔</button>
     </div>
@@ -111,7 +111,6 @@
   <div id="map"></div>
 
   <!-- Leaflet JS for Maps -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Firebase Scripts -->
@@ -119,16 +118,6 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // ==========================================
-    // 1. നിങ്ങളുടെ സ്റ്റോപ്പിന്റെ ലൊക്കേഷൻ (Lat, Lng)
-    // (ഇവിടെ നിങ്ങളുടെ കൃത്യമായ വീടിന്റെ/സ്റ്റോപ്പിന്റെ Lat, Lng നൽകുക)
-    // ==========================================
-    const TARGET_LAT = 8.6823;   
-    const TARGET_LNG = 76.8214;  
-    const TRIGGER_RADIUS_METERS = 500; // നോട്ടിഫിക്കേഷൻ വരേണ്ട ചുറ്റളവ് (500 മീറ്റർ)
-
-    let notificationSent = false;
-
     function startTracking() {
       if ("Notification" in window && Notification.permission !== "granted") {
         Notification.requestPermission();
@@ -136,9 +125,7 @@
       document.getElementById('welcomeModal').style.display = 'none';
     }
 
-    // ==========================================
-    // 2. FIREBASE CONFIG
-    // ==========================================
+    // FIREBASE CONFIG
     const firebaseConfig = {
       databaseURL: "https://gps-tracker-4714a-default-rtdb.firebaseio.com"
     };
@@ -147,132 +134,47 @@
     const database = firebase.database();
 
     // Leaflet Map Initialization
-    const map = L.map('map').setView([TARGET_LAT, TARGET_LNG], 16);
+    const map = L.map('map').setView([8.7335, 76.7722], 16);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // 🔵 1. നിങ്ങളുടെ സ്റ്റോപ്പ് / ലക്ഷ്യസ്ഥാനം (Blue Circle Dot)
-    const targetMarker = L.circleMarker([TARGET_LAT, TARGET_LNG], {
-      radius: 8,
-      fillColor: "#007bff", // നീല നിറം
-      color: "#ffffff",
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 1
-    }).addTo(map).bindPopup("<b>നിങ്ങളുടെ സ്റ്റോപ്പ്</b>");
-
-    let busMarker;
+    let gpsMarker;
     let firstLoad = true;
-    let lastDataTime = Date.now();
-
     const statusDiv = document.getElementById('status');
 
-    // Haversine Formula (ദൂരം മീറ്ററിൽ കണക്കാക്കുന്നു)
-    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-      const R = 6371000;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2); 
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-      return R * c;
-    }
-
-    // നോട്ടിഫിക്കേഷൻ അയക്കുന്ന ഫംഗ്ഷൻ
-    function triggerNotification(distance) {
-      if (!notificationSent) {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("വാഹനം അടുത്തെത്തി! 🚌", {
-            body: `വാഹനം നിങ്ങളുടെ ലൊക്കേഷന്റെ ${Math.round(distance)} മീറ്റർ ചുറ്റളവിൽ എത്തിയിരിക്കുന്നു!`,
-            icon: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
-          });
-        }
-        notificationSent = true;
-      }
-    }
-
     // Read Data from 'GPS' path
-    const gpsRef = database.ref('GPS');
-
-    gpsRef.on('value', (snapshot) => {
+    database.ref('GPS').on('value', (snapshot) => {
       const data = snapshot.val();
 
       if (data) {
-        lastDataTime = Date.now();
-
         const rawLat = data.Latitude || data.latitude || data.lat;
         const rawLng = data.longitude || data.Longitude || data.lng;
-        const deviceStatus = data.status || data.Status || "ONLINE";
 
         const lat = parseFloat(rawLat);
         const lng = parseFloat(rawLng);
 
-        if (deviceStatus === "ONLINE" && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          const sats = data.satellites || data.Satellites || 0;
+        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
           
-          const distanceMeters = getDistanceFromLatLonInMeters(lat, lng, TARGET_LAT, TARGET_LNG);
-
-          // ദൂരം 1 കിലോമീറ്ററിന് മുകളിലാണെങ്കിൽ KM ആയും, താഴെയാണെങ്കിൽ Meters ആയും കാണിക്കുന്നു
-          let distanceText = "";
-          if (distanceMeters >= 1000) {
-            distanceText = (distanceMeters / 1000).toFixed(1) + " km";
-          } else {
-            distanceText = Math.round(distanceMeters) + "m";
-          }
-
-          statusDiv.innerText = `Live GPS Connected 🟢 (${sats} Satellites) - ${distanceText} അകലെ`;
+          statusDiv.innerText = `GPS Live 🟢 Lat: ${lat}, Lng: ${lng}`;
           statusDiv.style.background = "rgba(40, 167, 69, 0.9)";
-          statusDiv.style.color = "#fff";
 
-          // 500 മീറ്റർ പരിധിയിൽ എത്തുമ്പോൾ നോട്ടിഫിക്കേഷൻ അയക്കുന്നു
-          if (distanceMeters <= TRIGGER_RADIUS_METERS) {
-            triggerNotification(distanceMeters);
+          if (gpsMarker) {
+            gpsMarker.setLatLng([lat, lng]);
           } else {
-            notificationSent = false;
+            gpsMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>ESP32 ജിപിഎസ് ട്രാക്കർ 🚌</b>");
           }
 
-          // 🔴 2. ലൈവ് ജിപിഎസ് ട്രാക്കർ (Red Circle Dot)
-          if (busMarker) {
-            busMarker.setLatLng([lat, lng]);
-          } else {
-            busMarker = L.circleMarker([lat, lng], {
-              radius: 9,
-              fillColor: "#dc3545", // ചുവപ്പ് നിറം
-              color: "#ffffff",
-              weight: 2,
-              opacity: 1,
-              fillOpacity: 1
-            }).addTo(map).bindPopup("<b>ലൈവ് ജിപിഎസ് ട്രാക്കർ 🚌</b>");
-          }
-
-          // ഓട്ടോമാറ്റിക് സൂം & ഫോളോ
           if (firstLoad) {
             map.setView([lat, lng], 17);
             firstLoad = false;
           } else {
             map.panTo([lat, lng]);
           }
-
-        } else if (deviceStatus === "NO_GPS_FIX") {
-          statusDiv.innerText = "Waiting for GPS Satellite Fix... 🟡 (0 Satellites)";
-          statusDiv.style.background = "rgba(255, 193, 7, 0.9)";
-          statusDiv.style.color = "#000";
         }
       }
     });
-
-    // ടൈമർ: കഴിഞ്ഞ 8 സെക്കൻഡായി ലൈവ് ഡാറ്റ വന്നില്ലെങ്കിൽ ഓഫ്‌ലൈനായി കാണിക്കും
-    setInterval(() => {
-      if (Date.now() - lastDataTime > 8000) {
-        statusDiv.innerText = "Bus Offline 🔴 (0 Satellites)";
-        statusDiv.style.background = "rgba(220, 53, 69, 0.9)";
-        statusDiv.style.color = "#fff";
-      }
-    }, 2000);
   </script>
 </body>
 </html>
