@@ -66,18 +66,22 @@
 
     let marker;
     let firstLoad = true;
+    let lastDataTime = Date.now();
+
+    const statusDiv = document.getElementById('status');
 
     // Read Data from 'GPS' path
     const gpsRef = database.ref('GPS');
 
     gpsRef.on('value', (snapshot) => {
       const data = snapshot.val();
-      const statusDiv = document.getElementById('status');
 
       if (data) {
+        lastDataTime = Date.now(); // പുതിയ ഡാറ്റ എത്തിയ സമയം രേഖപ്പെടുത്തുന്നു
+
         const rawLat = data.Latitude || data.latitude || data.lat;
         const rawLng = data.longitude || data.Longitude || data.lng;
-        const deviceStatus = data.status || data.Status || "OFFLINE";
+        const deviceStatus = data.status || data.Status || "ONLINE";
 
         const lat = parseFloat(rawLat);
         const lng = parseFloat(rawLng);
@@ -86,41 +90,36 @@
           const sats = data.satellites || data.Satellites || 0;
           
           statusDiv.innerText = `Live GPS Connected 🟢 (${sats} Satellites)`;
-          statusDiv.style.background = "rgba(40, 167, 69, 0.9)"; // Green
+          statusDiv.style.background = "rgba(40, 167, 69, 0.9)"; // Green Color
+          statusDiv.style.color = "#fff";
 
-          // Update Marker Position
+          // Marker Update
           if (marker) {
             marker.setLatLng([lat, lng]);
           } else {
             marker = L.marker([lat, lng]).addTo(map);
           }
 
-          // Center Map on Location First Time
           if (firstLoad) {
             map.setView([lat, lng], 16);
             firstLoad = false;
           }
         } else if (deviceStatus === "NO_GPS_FIX") {
           statusDiv.innerText = "Waiting for GPS Satellite Fix... 🟡 (0 Satellites)";
-          statusDiv.style.background = "rgba(255, 193, 7, 0.9)"; // Yellow
+          statusDiv.style.background = "rgba(255, 193, 7, 0.9)"; // Yellow Color
           statusDiv.style.color = "#000";
-        } else {
-          statusDiv.innerText = "Bus Offline 🔴 (0 Satellites)";
-          statusDiv.style.background = "rgba(220, 53, 69, 0.9)"; // Red
-          statusDiv.style.color = "#fff";
         }
-      } else {
-        statusDiv.innerText = "No data found under 'GPS' node!";
-        statusDiv.style.background = "rgba(220, 53, 69, 0.9)";
+      }
+    });
+
+    // ടൈമർ: കഴിഞ്ഞ 8 സെക്കൻഡായി ലൈവ് ഡാറ്റ വന്നില്ലെങ്കിൽ ഓഫ്‌ലൈനായി കാണിക്കും
+    setInterval(() => {
+      if (Date.now() - lastDataTime > 8000) {
+        statusDiv.innerText = "Bus Offline 🔴 (0 Satellites)";
+        statusDiv.style.background = "rgba(220, 53, 69, 0.9)"; // Red Color
         statusDiv.style.color = "#fff";
       }
-    }, (error) => {
-      const statusDiv = document.getElementById('status');
-      statusDiv.innerText = "Database Connection Failed!";
-      statusDiv.style.background = "rgba(220, 53, 69, 0.9)";
-      statusDiv.style.color = "#fff";
-      console.error(error);
-    });
+    }, 2000);
   </script>
 </body>
 </html>
