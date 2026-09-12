@@ -128,10 +128,27 @@
 
   <script>
     /* =====================================
-       START APP
+       START APP & REQUEST NOTIFICATION
     ===================================== */
     function startTracking() {
       document.getElementById("welcomeModal").style.display = "none";
+
+      // നോട്ടിഫിക്കേഷൻ പെർമിഷൻ ചോദിക്കുന്നു
+      if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+    }
+
+    /* =====================================
+       SEND NOTIFICATION FUNCTION
+    ===================================== */
+    function sendNotification(title, body) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, {
+          body: body,
+          icon: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
+        });
+      }
     }
 
     /* =====================================
@@ -201,7 +218,7 @@
     }
 
     /* =====================================
-       DISTANCE CALCULATION (FIXED RETURN)
+       DISTANCE CALCULATION
     ===================================== */
     function getDistance(lat, lng) {
       const trackerPosition = L.latLng(lat, lng);
@@ -267,12 +284,25 @@
       const distance = getDistance(lat, lng);
       const inside = distance <= GEOFENCE_RADIUS;
 
+      /* =====================================
+         GEOFENCE STATUS & NOTIFICATION
+      ===================================== */
       if (inside) {
         statusDiv.innerText = "🟢 GPS Live | Geofence ഉള്ളിൽ | " + Math.round(distance) + " m";
         statusDiv.style.background = "rgba(40,167,69,0.95)";
+
+        // പുറത്തുനിന്ന് ഉള്ളിലേക്ക് കടക്കുമ്പോൾ മാത്രം നോട്ടിഫിക്കേഷൻ
+        if (wasInside === false) {
+          sendNotification("🚌 GPS Tracker", "വാഹനം 500 മീറ്റർ ജിയോഫെൻസ് പരിധിക്കുള്ളിൽ എത്തിച്ചേർന്നു!");
+        }
       } else {
         statusDiv.innerText = "🔴 GPS Live | Geofence പുറത്ത് | " + Math.round(distance) + " m";
         statusDiv.style.background = "rgba(220,53,69,0.95)";
+
+        // ഉള്ളിൽനിന്ന് പുറത്തേക്ക് കടക്കുമ്പോൾ മാത്രം നോട്ടിഫിക്കേഷൻ
+        if (wasInside === true) {
+          sendNotification("🚌 GPS Tracker", "വാഹനം ജിയോഫെൻസ് പരിധിക്ക് പുറത്തുകടന്നു!");
+        }
       }
 
       if (gpsMarker) {
@@ -288,6 +318,7 @@
         map.panTo([lat, lng]);
       }
 
+      // നിലവിലെ അവസ്ഥ സേവ് ചെയ്യുന്നു
       wasInside = inside;
     }, function (error) {
       console.error(error);
