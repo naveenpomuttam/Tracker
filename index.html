@@ -4,51 +4,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live GPS Tracker</title>
+  <title>Live GPS & Attendance Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
-    html,
-    body {
+    html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
       font-family: Arial, sans-serif;
+      background: #f4f6f9;
     }
 
-    #map {
+    /* LOGIN MODAL */
+    #loginModal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #1a1a2e;
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      max-width: 380px;
       width: 100%;
-      height: 100vh;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     }
 
-    #status {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
-      padding: 10px 18px;
-      border-radius: 22px;
-      font-size: 14px;
-      text-align: center;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-      max-width: 90%;
-    }
+    .login-box h2 { margin-bottom: 20px; color: #1a73e8; }
+    .input-group { margin-bottom: 15px; text-align: left; }
+    .input-group label { display: block; margin-bottom: 5px; color: #666; font-size: 14px; }
+    .input-group input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+    .login-btn { width: 100%; padding: 12px; background: #1a73e8; border: none; color: white; border-radius: 25px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .error-msg { color: red; margin-top: 10px; font-size: 14px; display: none; }
 
     /* WELCOME MODAL */
     #welcomeModal {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.7);
       z-index: 9999;
-      display: flex;
+      display: none;
       justify-content: center;
       align-items: center;
       padding: 20px;
@@ -65,39 +73,73 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
 
-    .bus-icon {
-      font-size: 50px;
-      margin-bottom: 10px;
-    }
+    .bus-icon { font-size: 50px; margin-bottom: 10px; }
+    .modal-title { font-size: 20px; font-weight: bold; color: #1a73e8; margin-bottom: 10px; }
+    .modal-text { font-size: 14px; color: #444; line-height: 1.6; margin-bottom: 20px; }
+    .start-btn { background: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer; }
 
-    .modal-title {
-      font-size: 20px;
-      font-weight: bold;
-      color: #1a73e8;
-      margin-bottom: 10px;
-    }
+    /* MAIN APP INTERFACE */
+    #appContainer { display: none; width: 100%; height: 100%; position: relative; }
+    #map { width: 100%; height: 100vh; }
 
-    .modal-text {
-      font-size: 14px;
-      color: #444;
-      line-height: 1.6;
-      margin-bottom: 20px;
-    }
-
-    .start-btn {
-      background: #28a745;
+    /* FLOATING DASHBOARD & STATUS */
+    #statusCard {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.85);
       color: white;
-      border: none;
-      padding: 12px 24px;
-      font-size: 16px;
+      padding: 12px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      text-align: center;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+      max-width: 90%;
+      width: 350px;
+    }
+
+    .attendance-badge {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 4px 12px;
+      border-radius: 12px;
       font-weight: bold;
-      border-radius: 25px;
+      font-size: 13px;
+    }
+    .boarded { background-color: #28a745; color: white; }
+    .not-boarded { background-color: #dc3545; color: white; }
+    
+    .logout-link {
+      color: #aaa;
+      font-size: 12px;
+      text-decoration: underline;
       cursor: pointer;
+      margin-top: 6px;
+      display: block;
     }
   </style>
 </head>
 
 <body>
+
+  <!-- LOGIN MODAL -->
+  <div id="loginModal">
+    <div class="login-box">
+      <h2>🚌 Parent Login</h2>
+      <div class="input-group">
+        <label>Username</label>
+        <input type="text" id="usernameInput" placeholder="student1 or student2">
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="passwordInput" placeholder="Password">
+      </div>
+      <button class="login-btn" onclick="login()">ലോഗിൻ ചെയ്യുക</button>
+      <div class="error-msg" id="errorMsg">Username അല്ലെങ്കിൽ Password തെറ്റാണ്!</div>
+    </div>
+  </div>
 
   <!-- WELCOME MODAL -->
   <div id="welcomeModal">
@@ -105,7 +147,7 @@
       <div class="bus-icon">🚌</div>
       <div class="modal-title">സ്വാഗതം!</div>
       <div class="modal-text">
-        ഇത് <b>നവീൻ ചന്ദ്ര</b> വികസിപ്പിച്ചെടുത്ത ജിപിഎസ് ട്രാക്കർ ആപ്പാണ്.
+        ഇത് <b>നവീൻ ചന്ദ്ര</b> വികസിപ്പിച്ചെടുത്ത ജിപിഎസ് & അറ്റൻഡൻസ് ട്രാക്കർ ആപ്പാണ്.
         <br><br>
         ലൈവ് ട്രാക്കിംഗ് ആരംഭിക്കാൻ താഴെയുള്ള ബട്ടൺ ക്ലിക്ക് ചെയ്യുക.
       </div>
@@ -113,11 +155,20 @@
     </div>
   </div>
 
-  <!-- STATUS -->
-  <div id="status">Connecting to Firebase...</div>
+  <!-- MAIN APP CONTAINER -->
+  <div id="appContainer">
+    <!-- STATUS & ATTENDANCE CARD -->
+    <div id="statusCard">
+      <div id="studentNameDisplay" style="font-weight: bold; font-size: 16px; color: #4dabf7;">Student Dashboard</div>
+      <div id="attendanceStatus" class="attendance-badge not-boarded">NOT BOARDED 🔴</div>
+      <hr style="border: 0.5px solid #444; margin: 8px 0;">
+      <div id="status">Connecting to Firebase...</div>
+      <span class="logout-link" onclick="logout()">Logout</span>
+    </div>
 
-  <!-- MAP -->
-  <div id="map"></div>
+    <!-- MAP -->
+    <div id="map"></div>
+  </div>
 
   <!-- LEAFLET JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -127,6 +178,34 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
+    /* =====================================
+       LOGIN SYSTEM & USER CREDENTIALS
+    ===================================== */
+    const users = {
+      "student1": { pass: "123", name: "Student 1" },
+      "student2": { pass: "456", name: "Student 2" }
+    };
+
+    let currentUser = null;
+
+    function login() {
+      const u = document.getElementById("usernameInput").value.trim();
+      const p = document.getElementById("passwordInput").value.trim();
+
+      if (users[u] && users[u].pass === p) {
+        currentUser = u;
+        document.getElementById("loginModal").style.display = "none";
+        document.getElementById("welcomeModal").style.display = "flex";
+        document.getElementById("studentNameDisplay").innerText = users[u].name + " Tracking";
+      } else {
+        document.getElementById("errorMsg").style.display = "block";
+      }
+    }
+
+    function logout() {
+      location.reload();
+    }
+
     /* =====================================
        SERVICE WORKER REGISTRATION
     ===================================== */
@@ -146,31 +225,36 @@
     ===================================== */
     function startTracking() {
       document.getElementById("welcomeModal").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+
+      // Map Resize Trigger
+      setTimeout(() => { map.invalidateSize(); }, 300);
 
       // നോട്ടിഫിക്കേഷൻ പെർമിഷൻ ചോദിക്കുന്നു
       if ("Notification" in window && Notification.permission !== "granted") {
         Notification.requestPermission().then((permission) => {
           if (permission === "granted") {
-            sendNotification("🚌 GPS Tracker", "നോട്ടിഫിക്കേഷൻ പെർമിഷൻ വിജയകരമായി ലഭ്യമാക്കി!");
+            sendNotification("🚌 GPS Tracker", "നോട്ടിഫിക്കേഷൻ പെർമിഷൻ ലഭ്യമാക്കി!");
           }
         });
       }
+
+      // Start Firebase Listeners
+      initFirebaseListeners();
     }
 
     /* =====================================
-       SEND PWA NOTIFICATION VIA SERVICE WORKER
+       SEND PWA NOTIFICATION
     ===================================== */
     function sendNotification(title, body) {
       if ("Notification" in window && Notification.permission === "granted") {
         if (swRegistration && swRegistration.active) {
-          // Service Worker വഴി നോട്ടിഫിക്കേഷൻ അയക്കുന്നു
           swRegistration.active.postMessage({
             type: 'SHOW_NOTIFICATION',
             title: title,
             body: body
           });
         } else {
-          // ഫാൾബാക്ക് സാധാരണ നോട്ടിഫിക്കേഷൻ
           new Notification(title, {
             body: body,
             icon: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png"
@@ -190,7 +274,7 @@
     const database = firebase.database();
 
     /* =====================================
-       MAP
+       MAP & GEOFENCE
     ===================================== */
     const map = L.map("map").setView([8.7156794, 76.7772765], 16);
 
@@ -199,35 +283,25 @@
       attribution: "© OpenStreetMap"
     }).addTo(map);
 
-    /* =====================================
-       GEOFENCE
-    ===================================== */
     const GEOFENCE_LAT = 8.7156794;
     const GEOFENCE_LNG = 76.7772765;
     const GEOFENCE_RADIUS = 500;
 
     const geofenceCenter = L.latLng(GEOFENCE_LAT, GEOFENCE_LNG);
 
-    L.circle(geofenceCenter, {
-      radius: GEOFENCE_RADIUS
-    }).addTo(map).bindPopup("<b>500 മീറ്റർ Geofence</b>");
-
+    L.circle(geofenceCenter, { radius: GEOFENCE_RADIUS }).addTo(map).bindPopup("<b>500 മീറ്റർ Geofence</b>");
     L.marker(geofenceCenter).addTo(map).bindPopup("<b>Geofence Center 📍</b>");
 
-    /* =====================================
-       VARIABLES
-    ===================================== */
     let gpsMarker = null;
     let firstLoad = true;
     let wasInside = null;
+    let previousAttendance = null;
 
     const statusDiv = document.getElementById("status");
+    const attendanceDiv = document.getElementById("attendanceStatus");
     const OFFLINE_TIMEOUT = 6000;
     let lastUpdateTime = 0;
 
-    /* =====================================
-       REMOVE GPS MARKER
-    ===================================== */
     function removeGPSMarker() {
       if (gpsMarker) {
         map.removeLayer(gpsMarker);
@@ -235,123 +309,120 @@
       }
     }
 
-    /* =====================================
-       SET OFFLINE
-    ===================================== */
     function setTrackerOffline() {
       removeGPSMarker();
       statusDiv.innerText = "🔴 GPS Tracker Offline";
-      statusDiv.style.background = "rgba(220,53,69,0.95)";
       wasInside = null;
     }
 
-    /* =====================================
-       DISTANCE CALCULATION
-    ===================================== */
     function getDistance(lat, lng) {
       const trackerPosition = L.latLng(lat, lng);
       return geofenceCenter.distanceTo(trackerPosition);
     }
 
-    /* =====================================
-       CHECK OFFLINE EVERY 2 SECONDS
-    ===================================== */
     setInterval(function () {
       if (lastUpdateTime === 0) return;
-      const now = Date.now();
-      const difference = now - lastUpdateTime;
-      if (difference > OFFLINE_TIMEOUT) {
+      if (Date.now() - lastUpdateTime > OFFLINE_TIMEOUT) {
         setTrackerOffline();
       }
     }, 2000);
 
     /* =====================================
-       FIREBASE DATA
+       FIREBASE LISTENERS
     ===================================== */
-    database.ref("GPS").on("value", function (snapshot) {
-      const data = snapshot.val();
+    function initFirebaseListeners() {
+      // 1. Listen to Specific Student RFID Attendance Status
+      database.ref("Students/" + currentUser + "/status").on("value", function (snapshot) {
+        const attStatus = snapshot.val() || "NOT_BOARDED";
+        
+        if (attStatus === "BOARDED") {
+          attendanceDiv.innerText = "INSIDE BUS 🟢";
+          attendanceDiv.className = "attendance-badge boarded";
+          if (previousAttendance === "NOT_BOARDED") {
+            sendNotification("🚌 Attendance Update", users[currentUser].name + " ബസ്സിൽ കയറിയിട്ടുണ്ട്!");
+          }
+        } else {
+          attendanceDiv.innerText = "NOT BOARDED 🔴";
+          attendanceDiv.className = "attendance-badge not-boarded";
+          if (previousAttendance === "BOARDED") {
+            sendNotification("🚌 Attendance Update", users[currentUser].name + " ബസ്സിൽ നിന്ന് ഇറങ്ങിയിട്ടുണ്ട്!");
+          }
+        }
+        previousAttendance = attStatus;
+      });
 
-      if (!data) {
-        setTrackerOffline();
-        return;
-      }
+      // 2. Listen to Live GPS Data
+      database.ref("GPS").on("value", function (snapshot) {
+        const data = snapshot.val();
 
-      const gpsStatus = data.status || "OFFLINE";
-      const firebaseLastUpdate = data.lastUpdate;
-
-      if (firebaseLastUpdate) {
-        const currentTime = Date.now();
-        const dataAge = currentTime - firebaseLastUpdate;
-        if (dataAge > OFFLINE_TIMEOUT) {
+        if (!data) {
           setTrackerOffline();
           return;
         }
-      }
 
-      if (gpsStatus !== "ONLINE") {
-        removeGPSMarker();
-        statusDiv.innerText = "🟡 Waiting for GPS Fix...";
-        statusDiv.style.background = "rgba(255,193,7,0.95)";
-        return;
-      }
+        const gpsStatus = data.status || "OFFLINE";
+        const firebaseLastUpdate = data.lastUpdate;
 
-      const rawLat = data.latitude || data.Latitude || data.lat;
-      const rawLng = data.longitude || data.Longitude || data.lng;
-
-      const lat = parseFloat(rawLat);
-      const lng = parseFloat(rawLng);
-
-      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
-        removeGPSMarker();
-        statusDiv.innerText = "🟡 Waiting for valid GPS...";
-        return;
-      }
-
-      lastUpdateTime = Date.now();
-
-      const distance = getDistance(lat, lng);
-      const inside = distance <= GEOFENCE_RADIUS;
-
-      /* =====================================
-         GEOFENCE STATUS & NOTIFICATION
-      ===================================== */
-      if (inside) {
-        statusDiv.innerText = "🟢 GPS Live | Geofence ഉള്ളിൽ | " + Math.round(distance) + " m";
-        statusDiv.style.background = "rgba(40,167,69,0.95)";
-
-        // പുറത്തുനിന്ന് ഉള്ളിലേക്ക് കടക്കുമ്പോൾ നോട്ടിഫിക്കേഷൻ
-        if (wasInside === false) {
-          sendNotification("🚌 GPS Tracker", "വാഹനം 500 മീറ്റർ ജിയോഫെൻസ് പരിധിക്കുള്ളിൽ എത്തിച്ചേർന്നു!");
+        if (firebaseLastUpdate) {
+          if (Date.now() - firebaseLastUpdate > OFFLINE_TIMEOUT) {
+            setTrackerOffline();
+            return;
+          }
         }
-      } else {
-        statusDiv.innerText = "🔴 GPS Live | Geofence പുറത്ത് | " + Math.round(distance) + " m";
-        statusDiv.style.background = "rgba(220,53,69,0.95)";
 
-        // ഉള്ളിൽനിന്ന് പുറത്തേക്ക് കടക്കുമ്പോൾ നോട്ടിഫിക്കേഷൻ
-        if (wasInside === true) {
-          sendNotification("🚌 GPS Tracker", "വാഹനം ജിയോഫെൻസ് പരിധിക്ക് പുറത്തുകടന്നു!");
+        if (gpsStatus !== "ONLINE") {
+          removeGPSMarker();
+          statusDiv.innerText = "🟡 Waiting for GPS Fix...";
+          return;
         }
-      }
 
-      if (gpsMarker) {
-        gpsMarker.setLatLng([lat, lng]);
-      } else {
-        gpsMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>ESP32 GPS Tracker 🚌</b>");
-      }
+        const rawLat = data.latitude || data.Latitude || data.lat;
+        const rawLng = data.longitude || data.Longitude || data.lng;
 
-      if (firstLoad) {
-        map.setView([lat, lng], 17);
-        firstLoad = false;
-      } else {
-        map.panTo([lat, lng]);
-      }
+        const lat = parseFloat(rawLat);
+        const lng = parseFloat(rawLng);
 
-      // നിലവിലെ അവസ്ഥ സേവ് ചെയ്യുന്നു
-      wasInside = inside;
-    }, function (error) {
-      console.error(error);
-      setTrackerOffline();
-    });
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+          removeGPSMarker();
+          statusDiv.innerText = "🟡 Waiting for valid GPS...";
+          return;
+        }
+
+        lastUpdateTime = Date.now();
+        const distance = getDistance(lat, lng);
+        const inside = distance <= GEOFENCE_RADIUS;
+
+        if (inside) {
+          statusDiv.innerText = "🟢 GPS Live | Geofence ഉള്ളിൽ | " + Math.round(distance) + " m";
+          if (wasInside === false) {
+            sendNotification("🚌 GPS Tracker", "വാഹനം 500 മീറ്റർ ജിയോഫെൻസ് പരിധിക്കുള്ളിൽ എത്തിച്ചേർന്നു!");
+          }
+        } else {
+          statusDiv.innerText = "🔴 GPS Live | Geofence പുറത്ത് | " + Math.round(distance) + " m";
+          if (wasInside === true) {
+            sendNotification("🚌 GPS Tracker", "വാഹനം ജിയോഫെൻസ് പരിധിക്ക് പുറത്തുകടന്നു!");
+          }
+        }
+
+        if (gpsMarker) {
+          gpsMarker.setLatLng([lat, lng]);
+        } else {
+          gpsMarker = L.marker([lat, lng]).addTo(map).bindPopup("<b>ESP32 Bus Tracker 🚌</b>");
+        }
+
+        if (firstLoad) {
+          map.setView([lat, lng], 17);
+          firstLoad = false;
+        } else {
+          map.panTo([lat, lng]);
+        }
+
+        wasInside = inside;
+      }, function (error) {
+        console.error(error);
+        setTrackerOffline();
+      });
+    }
   </script>
 </body>
 
